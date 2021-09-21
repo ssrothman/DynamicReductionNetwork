@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 from .DynamicReductionNetworkJit import DynamicReductionNetworkJit
-from .DynamicReductionNetworkOld import DynamicReductionNetworkOld
-from .DynamicReductionNetworkTriton_v1.py import DynamicReductionNetworkTriton_v1
 
 class DynamicReductionNetwork(nn.Module):
     '''
@@ -35,14 +33,10 @@ class DynamicReductionNetwork(nn.Module):
                  graph_features = False,
                  latent_probe=None,
                  actually_jit=True,
-                 original_drn=False,
     ):
         super(DynamicReductionNetwork, self).__init__()
 #        DRN = DynamicReductionNetworkJit
-        DRN = DynamicReductionNetworkTriton_v1
-        if original_drn:
-            DRN = DynamicReductionNetworkOld
-        
+
         drn = DRN(
             input_dim=input_dim,
             hidden_dim=hidden_dim,
@@ -55,23 +49,17 @@ class DynamicReductionNetwork(nn.Module):
                 in_layers=in_layers,
             out_layers=out_layers,
             graph_features=graph_features,
-            #latent_probe=latent_probe
+            latent_probe=latent_probe
         )
-        if not original_drn:
-            if actually_jit:
-                self.drn = torch.jit.script(drn)
-            else:
-                self.drn = drn
+        if actually_jit:
+            self.drn = torch.jit.script(drn)
         else:
             self.drn = drn
-
+            
     def forward(self, data):
         '''
         Push the batch 'data' through the network
         '''
-        if isinstance(self.drn, DynamicReductionNetworkOld):
-            return self.drn(data)
-        
         return self.drn(
             data.x,
             data.batch if hasattr(data, 'batch') else torch.zeros((data.x.shape()[0], ),
